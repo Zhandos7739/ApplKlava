@@ -17,5 +17,9 @@
     "@capacitor/android": "^8.2.0",
     "@capacitor/cli": "^8.2.0",
     "@capacitor/core": "^8.2.0"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.63.0",
+    "puppeteer-core": "^25.11.0"
   }
 }

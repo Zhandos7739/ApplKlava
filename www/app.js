@@ -135,9 +135,12 @@
   }
 
   function setMode(mode) {
-    state.mode = mode;
-    el.chipSmart.classList.toggle("active", mode === "smart");
-    el.chipNormal.classList.toggle("active", mode === "normal");
+    state.mode = mode === "normal" ? "normal" : "smart";
+    el.chipSmart.classList.toggle("active", state.mode === "smart");
+    el.chipNormal.classList.toggle("active", state.mode === "normal");
+    el.chipSmart.setAttribute("aria-selected", state.mode === "smart" ? "true" : "false");
+    el.chipNormal.setAttribute("aria-selected", state.mode === "normal" ? "true" : "false");
+    document.body.dataset.mode = state.mode;
     save();
   }
 
@@ -258,7 +261,6 @@
   }
 
   function updateDebug(hit, chose, speed, zoneMul) {
-    if (!state.debug) return;
     el.dbgHit.textContent = hit ? hit.label : "—";
     el.dbgChose.textContent = chose ? chose.label : "—";
     el.dbgBias.textContent = `${state.bias.x.toFixed(1)}, ${state.bias.y.toFixed(1)}`;
@@ -364,8 +366,18 @@
     setTimeout(() => el.output.removeAttribute("readonly"), 10);
   });
 
-  el.chipSmart.addEventListener("click", () => setMode("smart"));
-  el.chipNormal.addEventListener("click", () => setMode("normal"));
+  // Mode chips — single delegated handler (more reliable on touch / automation).
+  document.querySelector(".modes").addEventListener(
+    "pointerdown",
+    (e) => {
+      const btn = e.target.closest("[data-mode]");
+      if (!btn) return;
+      e.preventDefault();
+      e.stopPropagation();
+      setMode(btn.dataset.mode);
+    },
+    { passive: false }
+  );
 
   el.btnResetStats.addEventListener("click", () => {
     state.miss.smart = 0;
@@ -422,4 +434,11 @@
   updateStatsUI();
   syncSliders();
   requestAnimationFrame(measureKeys);
+
+  // Public API for inline handlers / debugging
+  window.ApplKlava = {
+    setMode,
+    getMode: () => state.mode,
+    getState: () => ({ ...state, settings: { ...state.settings }, miss: { ...state.miss } }),
+  };
 })();
