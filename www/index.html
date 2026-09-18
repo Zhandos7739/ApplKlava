@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1220" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>ApplKlava — динамическая зона</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <div class="brand">
+        <span class="brand-mark">AK</span>
+        <div>
+          <h1>ApplKlava</h1>
+          <p>Динамическая зона нажатия</p>
+        </div>
+      </div>
+      <button type="button" id="btnInfo" class="icon-btn" aria-label="Отладка" title="Отладка">i</button>
+    </header>
+
+    <section class="modes" aria-label="Режим ввода">
+      <button type="button" class="mode-chip active" data-mode="smart" id="chipSmart">
+        <span class="chip-label">Нано</span>
+        <span class="chip-sub">умные зоны</span>
+      </button>
+      <button type="button" class="mode-chip" data-mode="normal" id="chipNormal">
+        <span class="chip-label">Обычный</span>
+        <span class="chip-sub">жёсткая сетка</span>
+      </button>
+    </section>
+
+    <section class="stats" aria-label="Счётчики промахов">
+      <div class="stat">
+        <span class="stat-k">Нано</span>
+        <span class="stat-v" id="missSmart">0</span>
+        <span class="stat-h">промахов</span>
+      </div>
+      <div class="stat">
+        <span class="stat-k">Обычный</span>
+        <span class="stat-v" id="missNormal">0</span>
+        <span class="stat-h">промахов</span>
+      </div>
+      <button type="button" id="btnResetStats" class="link-btn">сброс</button>
+    </section>
+
+    <section class="editor">
+      <textarea id="output" rows="3" placeholder="Печатай здесь… сравни Нано и Обычный" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+      <div class="debug" id="debugPanel" hidden>
+        <div class="debug-row"><span>hit</span><strong id="dbgHit">—</strong></div>
+        <div class="debug-row"><span>chose</span><strong id="dbgChose">—</strong></div>
+        <div class="debug-row"><span>bias</span><strong id="dbgBias">0, 0</strong></div>
+        <div class="debug-row"><span>speed</span><strong id="dbgSpeed">0</strong></div>
+        <div class="debug-row"><span>zone</span><strong id="dbgZone">1.0×</strong></div>
+      </div>
+    </section>
+
+    <section class="settings" id="settingsPanel">
+      <div class="settings-head">
+        <h2>Настройки зоны</h2>
+        <button type="button" id="btnToggleSettings" class="link-btn">свернуть</button>
+      </div>
+      <div class="settings-body" id="settingsBody">
+        <label class="slider-row">
+          <div class="slider-meta">
+            <span>Ширина зоны</span>
+            <strong id="valZoneWidth">1.35×</strong>
+          </div>
+          <input type="range" id="slZoneWidth" min="1" max="2.2" step="0.05" value="1.35" />
+        </label>
+        <label class="slider-row">
+          <div class="slider-meta">
+            <span>Вес частотности</span>
+            <strong id="valFreq">0.55</strong>
+          </div>
+          <input type="range" id="slFreq" min="0" max="1" step="0.05" value="0.55" />
+        </label>
+        <label class="slider-row">
+          <div class="slider-meta">
+            <span>Прощение скорости</span>
+            <strong id="valSpeed">0.70</strong>
+          </div>
+          <input type="range" id="slSpeed" min="0" max="1.5" step="0.05" value="0.70" />
+        </label>
+        <label class="slider-row">
+          <div class="slider-meta">
+            <span>Скорость калибровки</span>
+            <strong id="valCalib">0.12</strong>
+          </div>
+          <input type="range" id="slCalib" min="0" max="0.4" step="0.02" value="0.12" />
+        </label>
+        <label class="toggle-row">
+          <span>Показывать кольцо зоны</span>
+          <input type="checkbox" id="chkRing" checked />
+        </label>
+      </div>
+    </section>
+
+    <div class="kb-wrap">
+      <div id="zoneRing" class="zone-ring" hidden></div>
+      <div id="keyboard" class="keyboard" aria-label="Клавиатура"></div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

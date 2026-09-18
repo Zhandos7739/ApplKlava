@@ -1,0 +1,21 @@
+{
+  "name": "applklava",
+  "version": "1.0.0",
+  "description": "Virtual keyboard with dynamic press zones (Nano mode)",
+  "private": true,
+  "scripts": {
+    "serve": "npx --yes serve www -p 4173",
+    "sync": "npx cap sync android",
+    "build:apk": "bash scripts/build-apk.sh"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Zhandos7739/ApplKlava.git"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/android": "^8.2.0",
+    "@capacitor/cli": "^8.2.0",
+    "@capacitor/core": "^8.2.0"
+  }
+}
