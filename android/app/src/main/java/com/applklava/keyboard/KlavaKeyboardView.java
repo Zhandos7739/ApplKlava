@@ -7,9 +7,11 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.os.SystemClock;
 import android.util.AttributeSet;
+import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.WindowManager;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -18,8 +20,8 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Soft keyboard with dynamic press zones (Nano): weighted score by
- * letter frequency / distance², speed forgiveness, and bias self-calibration.
+ * Compact soft keyboard: Nano dynamic zones, space-swipe language switch (RU/EN),
+ * slang dictionary suggestions. No zone-ring overlays.
  */
 public class KlavaKeyboardView extends View {
 
@@ -27,48 +29,67 @@ public class KlavaKeyboardView extends View {
         void onKey(String label);
         void onSwitchToSystem();
         void onOpenSettings();
+        /** Current composing word prefix before cursor (letters only). */
+        String currentWordPrefix();
     }
 
-    private static final String[][] LAYOUT = {
+    private static final String[][] LAYOUT_RU = {
             {"й", "ц", "у", "к", "е", "н", "г", "ш", "щ", "з", "х"},
             {"ф", "ы", "в", "а", "п", "р", "о", "л", "д", "ж", "э"},
             {"⇧", "я", "ч", "с", "м", "и", "т", "ь", "б", "ю", "⌫"},
             {"🌐", ",", "␣", ".", "↵"}
     };
 
-    private static final Map<String, Float> FREQ = new HashMap<>();
+    private static final String[][] LAYOUT_EN = {
+            {"q", "w", "e", "r", "t", "y", "u", "i", "o", "p"},
+            {"a", "s", "d", "f", "g", "h", "j", "k", "l"},
+            {"⇧", "z", "x", "c", "v", "b", "n", "m", "⌫"},
+            {"🌐", ",", "␣", ".", "↵"}
+    };
+
+    private static final Map<String, Float> FREQ_RU = new HashMap<>();
+    private static final Map<String, Float> FREQ_EN = new HashMap<>();
     static {
-        FREQ.put("о", 1.00f); FREQ.put("е", 0.92f); FREQ.put("а", 0.90f); FREQ.put("и", 0.82f);
-        FREQ.put("н", 0.78f); FREQ.put("т", 0.72f); FREQ.put("с", 0.68f); FREQ.put("р", 0.62f);
-        FREQ.put("в", 0.58f); FREQ.put("л", 0.55f); FREQ.put("к", 0.50f); FREQ.put("м", 0.46f);
-        FREQ.put("д", 0.44f); FREQ.put("п", 0.42f); FREQ.put("у", 0.40f); FREQ.put("я", 0.36f);
-        FREQ.put("ы", 0.34f); FREQ.put("ь", 0.32f); FREQ.put("г", 0.30f); FREQ.put("з", 0.28f);
-        FREQ.put("б", 0.26f); FREQ.put("ч", 0.24f); FREQ.put("й", 0.20f); FREQ.put("х", 0.18f);
-        FREQ.put("ж", 0.16f); FREQ.put("ш", 0.15f); FREQ.put("ю", 0.14f); FREQ.put("ц", 0.12f);
-        FREQ.put("щ", 0.10f); FREQ.put("э", 0.08f); FREQ.put("ф", 0.06f); FREQ.put("ъ", 0.04f);
-        FREQ.put(",", 0.20f); FREQ.put(".", 0.20f);
+        FREQ_RU.put("о", 1.00f); FREQ_RU.put("е", 0.92f); FREQ_RU.put("а", 0.90f); FREQ_RU.put("и", 0.82f);
+        FREQ_RU.put("н", 0.78f); FREQ_RU.put("т", 0.72f); FREQ_RU.put("с", 0.68f); FREQ_RU.put("р", 0.62f);
+        FREQ_RU.put("в", 0.58f); FREQ_RU.put("л", 0.55f); FREQ_RU.put("к", 0.50f); FREQ_RU.put("м", 0.46f);
+        FREQ_RU.put("д", 0.44f); FREQ_RU.put("п", 0.42f); FREQ_RU.put("у", 0.40f); FREQ_RU.put("я", 0.36f);
+        FREQ_RU.put("ы", 0.34f); FREQ_RU.put("ь", 0.32f); FREQ_RU.put("г", 0.30f); FREQ_RU.put("з", 0.28f);
+        FREQ_RU.put("б", 0.26f); FREQ_RU.put("ч", 0.24f); FREQ_RU.put("й", 0.20f); FREQ_RU.put("х", 0.18f);
+        FREQ_RU.put("ж", 0.16f); FREQ_RU.put("ш", 0.15f); FREQ_RU.put("ю", 0.14f); FREQ_RU.put("ц", 0.12f);
+        FREQ_RU.put("щ", 0.10f); FREQ_RU.put("э", 0.08f); FREQ_RU.put("ф", 0.06f);
+
+        FREQ_EN.put("e", 1.00f); FREQ_EN.put("t", 0.91f); FREQ_EN.put("a", 0.82f); FREQ_EN.put("o", 0.75f);
+        FREQ_EN.put("i", 0.70f); FREQ_EN.put("n", 0.67f); FREQ_EN.put("s", 0.63f); FREQ_EN.put("h", 0.60f);
+        FREQ_EN.put("r", 0.55f); FREQ_EN.put("d", 0.43f); FREQ_EN.put("l", 0.40f); FREQ_EN.put("c", 0.28f);
+        FREQ_EN.put("u", 0.27f); FREQ_EN.put("m", 0.24f); FREQ_EN.put("w", 0.23f); FREQ_EN.put("f", 0.22f);
+        FREQ_EN.put("g", 0.20f); FREQ_EN.put("y", 0.19f); FREQ_EN.put("p", 0.18f); FREQ_EN.put("b", 0.15f);
+        FREQ_EN.put("v", 0.10f); FREQ_EN.put("k", 0.08f); FREQ_EN.put("j", 0.02f); FREQ_EN.put("x", 0.02f);
+        FREQ_EN.put("q", 0.01f); FREQ_EN.put("z", 0.01f);
     }
 
     private final List<Key> keys = new ArrayList<>();
+    private final List<RectF> suggestHit = new ArrayList<>();
+    private final List<String> suggestWords = new ArrayList<>();
+    private final WordDictionary dict = new WordDictionary();
+
     private final Paint keyPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint keyPressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint specialPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint bgPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint ringPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Paint hintPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final RectF tmp = new RectF();
+    private final Paint chipPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint chipTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+    private final Paint langToastPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
     private Listener listener;
     private SharedPreferences prefs;
 
+    private boolean english;
     private boolean shift;
     private boolean caps;
     private Key pressedKey;
-    private Key ghostKey;
     private Key chosenKey;
-    private float ringCx, ringCy, ringR;
-    private long ringUntil;
     private long flashUntil;
 
     private float biasX, biasY;
@@ -82,6 +103,14 @@ public class KlavaKeyboardView extends View {
     private float calibRate = 0.12f;
 
     private int activePointerId = MotionEvent.INVALID_POINTER_ID;
+    private float downX, downY;
+    private boolean spaceTracking;
+    private boolean spaceSwiped;
+    private String langToast;
+    private long langToastUntil;
+
+    private float suggestH;
+    private float keyboardH;
 
     public KlavaKeyboardView(Context context) {
         super(context);
@@ -111,12 +140,14 @@ public class KlavaKeyboardView extends View {
         specialPaint.setColor(0xFF8AA0BD);
         specialPaint.setTextAlign(Paint.Align.CENTER);
         specialPaint.setFakeBoldText(true);
-        ringPaint.setStyle(Paint.Style.STROKE);
-        ringPaint.setStrokeWidth(dp(2));
-        ringPaint.setColor(0xD93DD6C6);
-        hintPaint.setColor(0xFF6EA8FF);
-        hintPaint.setTextAlign(Paint.Align.CENTER);
-        hintPaint.setTextSize(dp(11));
+        chipPaint.setColor(0xFF16253B);
+        chipTextPaint.setColor(0xFFE8F1FF);
+        chipTextPaint.setTextAlign(Paint.Align.CENTER);
+        chipTextPaint.setFakeBoldText(true);
+        langToastPaint.setColor(0xEE3DD6C6);
+        langToastPaint.setTextAlign(Paint.Align.CENTER);
+        langToastPaint.setFakeBoldText(true);
+        langToastPaint.setTextSize(dp(16));
 
         setClickable(true);
         setFocusable(false);
@@ -128,6 +159,7 @@ public class KlavaKeyboardView extends View {
 
     public void reloadPrefs() {
         loadPrefs();
+        refreshSuggestions();
         invalidate();
     }
 
@@ -138,6 +170,11 @@ public class KlavaKeyboardView extends View {
         calibRate = prefs.getFloat("calibRate", 0.12f);
         biasX = prefs.getFloat("biasX", 0f);
         biasY = prefs.getFloat("biasY", 0f);
+        english = prefs.getBoolean("english", false);
+    }
+
+    private void saveLang() {
+        prefs.edit().putBoolean("english", english).apply();
     }
 
     private void saveBias() {
@@ -148,28 +185,52 @@ public class KlavaKeyboardView extends View {
         return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, v, getResources().getDisplayMetrics());
     }
 
+    private int screenHeight() {
+        WindowManager wm = (WindowManager) getContext().getSystemService(Context.WINDOW_SERVICE);
+        DisplayMetrics dm = new DisplayMetrics();
+        if (wm != null) {
+            wm.getDefaultDisplay().getMetrics(dm);
+            return dm.heightPixels;
+        }
+        return getResources().getDisplayMetrics().heightPixels;
+    }
+
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int w = MeasureSpec.getSize(widthMeasureSpec);
-        int h = (int) dp(280);
+        // Fit small phones: ~32% of screen, capped.
+        int target = Math.round(screenHeight() * 0.32f);
+        int minH = (int) dp(200);
+        int maxH = (int) dp(248);
+        int h = Math.max(minH, Math.min(maxH, target));
+        suggestH = dp(36);
+        keyboardH = h - suggestH;
         setMeasuredDimension(w, h);
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
-        layoutKeys(w, h);
+        suggestH = dp(36);
+        keyboardH = h - suggestH;
+        layoutKeys(w, (int) keyboardH);
+        refreshSuggestions();
+    }
+
+    private String[][] currentLayout() {
+        return english ? LAYOUT_EN : LAYOUT_RU;
     }
 
     private void layoutKeys(int w, int h) {
         keys.clear();
-        float pad = dp(6);
-        float gap = dp(5);
-        float topPad = dp(8);
-        float rowH = (h - topPad - pad - gap * 3) / 4f;
+        String[][] layout = currentLayout();
+        float pad = dp(4);
+        float gap = dp(3.5f);
+        float topPad = dp(4);
+        float rowH = (h - topPad - pad - gap * (layout.length - 1)) / (float) layout.length;
 
-        for (int r = 0; r < LAYOUT.length; r++) {
-            String[] row = LAYOUT[r];
+        for (int r = 0; r < layout.length; r++) {
+            String[] row = layout[r];
             float[] weights = new float[row.length];
             float total = 0f;
             for (int i = 0; i < row.length; i++) {
@@ -178,7 +239,7 @@ public class KlavaKeyboardView extends View {
             }
             float x = pad;
             float usable = w - pad * 2 - gap * (row.length - 1);
-            float y = topPad + r * (rowH + gap);
+            float y = suggestH + topPad + r * (rowH + gap);
             for (int i = 0; i < row.length; i++) {
                 float kw = usable * (weights[i] / total);
                 Key k = new Key();
@@ -196,14 +257,40 @@ public class KlavaKeyboardView extends View {
 
     private float weightFor(String label) {
         switch (label) {
-            case "␣": return 5.2f;
+            case "␣": return 5.4f;
             case "⌫":
             case "↵":
-            case "⇧": return 1.45f;
-            case "🌐": return 1.9f;
+            case "⇧": return 1.4f;
+            case "🌐": return 1.55f;
             case ",":
-            case ".": return 1.1f;
+            case ".": return 1.05f;
             default: return 1f;
+        }
+    }
+
+    public void refreshSuggestions() {
+        String prefix = listener != null ? safe(listener.currentWordPrefix()) : "";
+        suggestWords.clear();
+        suggestWords.addAll(dict.suggestions(prefix, english, 4));
+        layoutSuggestionHits();
+        invalidate();
+    }
+
+    private static String safe(String s) {
+        return s == null ? "" : s;
+    }
+
+    private void layoutSuggestionHits() {
+        suggestHit.clear();
+        if (suggestWords.isEmpty() || getWidth() <= 0) return;
+        float pad = dp(4);
+        float gap = dp(4);
+        float chipW = (getWidth() - pad * 2 - gap * (suggestWords.size() - 1)) / (float) suggestWords.size();
+        float top = dp(4);
+        float h = suggestH - dp(8);
+        for (int i = 0; i < suggestWords.size(); i++) {
+            float x = pad + i * (chipW + gap);
+            suggestHit.add(new RectF(x, top, x + chipW, top + h));
         }
     }
 
@@ -212,10 +299,19 @@ public class KlavaKeyboardView extends View {
         canvas.drawRect(0, 0, getWidth(), getHeight(), bgPaint);
         long now = SystemClock.uptimeMillis();
 
+        // Suggestion chips
+        chipTextPaint.setTextSize(dp(13));
+        for (int i = 0; i < suggestWords.size() && i < suggestHit.size(); i++) {
+            RectF r = suggestHit.get(i);
+            canvas.drawRoundRect(r, dp(8), dp(8), chipPaint);
+            float ty = r.centerY() - (chipTextPaint.descent() + chipTextPaint.ascent()) / 2f;
+            canvas.drawText(suggestWords.get(i), r.centerX(), ty, chipTextPaint);
+        }
+
+        float radius = dp(7);
         for (Key k : keys) {
             boolean press = k == pressedKey || (k == chosenKey && now < flashUntil);
             Paint fill = press ? keyPressPaint : keyPaint;
-            float radius = dp(10);
             canvas.drawRoundRect(k.bounds, radius, radius, fill);
 
             String draw = displayLabel(k.label);
@@ -225,13 +321,8 @@ public class KlavaKeyboardView extends View {
             canvas.drawText(draw, k.cx, textY, tp);
         }
 
-        if (now < ringUntil && ringR > 0) {
-            canvas.drawCircle(ringCx, ringCy, ringR, ringPaint);
-        }
-        if (ghostKey != null && chosenKey != null && ghostKey != chosenKey && now < flashUntil) {
-            // subtle hint that soft-zone corrected the hit
-            canvas.drawText("→ " + displayLabel(chosenKey.label),
-                    chosenKey.cx, chosenKey.bounds.top - dp(2), hintPaint);
+        if (langToast != null && now < langToastUntil) {
+            canvas.drawText(langToast, getWidth() / 2f, suggestH + keyboardH / 2f, langToastPaint);
         }
     }
 
@@ -241,16 +332,17 @@ public class KlavaKeyboardView extends View {
     }
 
     private float textSizeFor(String label) {
-        if ("␣".equals(label)) return dp(14);
-        if ("🌐".equals(label) || "⇧".equals(label)) return dp(16);
-        return dp(20);
+        if ("␣".equals(label)) return dp(12);
+        if ("🌐".equals(label)) return dp(11);
+        if ("⇧".equals(label) || "⌫".equals(label) || "↵".equals(label)) return dp(14);
+        return dp(17);
     }
 
     private String displayLabel(String label) {
         switch (label) {
-            case "␣": return "пробел";
+            case "␣": return english ? "en · swipe" : "ru · свайп";
             case "🌐": return "Обыч.";
-            case "⇧": return shift || caps ? "⇧" : "⇧";
+            case "⇧": return "⇧";
             case "⌫": return "⌫";
             case "↵": return "↵";
             default:
@@ -269,13 +361,43 @@ public class KlavaKeyboardView extends View {
                 if (activePointerId != MotionEvent.INVALID_POINTER_ID) return true;
                 int idx = event.getActionIndex();
                 activePointerId = event.getPointerId(idx);
-                handlePress(event.getX(idx), event.getY(idx));
+                downX = event.getX(idx);
+                downY = event.getY(idx);
+                spaceSwiped = false;
+                spaceTracking = false;
+
+                int sug = hitSuggestion(downX, downY);
+                if (sug >= 0) {
+                    pressedKey = null;
+                    invalidate();
+                    return true;
+                }
+
+                Key hit = hardHit(downX, downY);
+                pressedKey = hit;
+                spaceTracking = hit != null && "␣".equals(hit.label);
+                invalidate();
                 return true;
             }
             case MotionEvent.ACTION_MOVE: {
                 int idx = event.findPointerIndex(activePointerId);
                 if (idx < 0) return true;
-                Key under = hardHit(event.getX(idx), event.getY(idx));
+                float x = event.getX(idx);
+                float y = event.getY(idx);
+
+                if (spaceTracking) {
+                    float dx = x - downX;
+                    if (Math.abs(dx) > dp(36)) {
+                        spaceSwiped = true;
+                        // Preview the language we will switch TO
+                        langToast = english ? "Русский" : "English";
+                        langToastUntil = SystemClock.uptimeMillis() + 600;
+                        invalidate();
+                    }
+                    return true;
+                }
+
+                Key under = hardHit(x, y);
                 if (under != pressedKey) {
                     pressedKey = under;
                     invalidate();
@@ -286,7 +408,6 @@ public class KlavaKeyboardView extends View {
             case MotionEvent.ACTION_POINTER_UP: {
                 int idx = event.findPointerIndex(activePointerId);
                 if (idx < 0) {
-                    // wrong pointer ended
                     if (event.getPointerId(event.getActionIndex()) == activePointerId) {
                         activePointerId = MotionEvent.INVALID_POINTER_ID;
                         pressedKey = null;
@@ -298,12 +419,37 @@ public class KlavaKeyboardView extends View {
                 float y = event.getY(idx);
                 activePointerId = MotionEvent.INVALID_POINTER_ID;
                 pressedKey = null;
+
+                int sug = hitSuggestion(downX, downY);
+                if (sug >= 0 && Math.hypot(x - downX, y - downY) < dp(24)) {
+                    commitSuggestion(suggestWords.get(sug));
+                    spaceTracking = false;
+                    invalidate();
+                    return true;
+                }
+
+                if (spaceTracking) {
+                    float dx = x - downX;
+                    if (spaceSwiped || Math.abs(dx) > dp(36)) {
+                        toggleLanguage();
+                    } else {
+                        // normal space tap
+                        commitAt(downX, downY);
+                    }
+                    spaceTracking = false;
+                    spaceSwiped = false;
+                    invalidate();
+                    return true;
+                }
+
                 commitAt(x, y);
                 return true;
             }
             case MotionEvent.ACTION_CANCEL:
                 activePointerId = MotionEvent.INVALID_POINTER_ID;
                 pressedKey = null;
+                spaceTracking = false;
+                spaceSwiped = false;
                 invalidate();
                 return true;
             default:
@@ -311,8 +457,34 @@ public class KlavaKeyboardView extends View {
         }
     }
 
-    private void handlePress(float x, float y) {
-        pressedKey = hardHit(x, y);
+    private int hitSuggestion(float x, float y) {
+        for (int i = 0; i < suggestHit.size(); i++) {
+            if (suggestHit.get(i).contains(x, y)) return i;
+        }
+        return -1;
+    }
+
+    private void commitSuggestion(String word) {
+        if (listener == null || word == null) return;
+        String prefix = safe(listener.currentWordPrefix());
+        // delete prefix letters then commit full word + space
+        for (int i = 0; i < prefix.length(); i++) {
+            listener.onKey("⌫");
+        }
+        listener.onKey(word);
+        listener.onKey(" ");
+        if (shift && !caps) shift = false;
+        refreshSuggestions();
+    }
+
+    private void toggleLanguage() {
+        english = !english;
+        saveLang();
+        shift = false;
+        langToast = english ? "English" : "Русский";
+        langToastUntil = SystemClock.uptimeMillis() + 700;
+        layoutKeys(getWidth(), (int) keyboardH);
+        refreshSuggestions();
         invalidate();
     }
 
@@ -336,15 +508,8 @@ public class KlavaKeyboardView extends View {
             return;
         }
 
-        ghostKey = hit;
         chosenKey = chose;
-        flashUntil = now + 160;
-        if (!isSpecial(chose.label) || ",".equals(chose.label) || ".".equals(chose.label)) {
-            ringCx = chose.cx;
-            ringCy = chose.cy;
-            ringR = Math.max(chose.halfW, chose.halfH) * pick.zoneMul * 0.9f;
-            ringUntil = now + 220;
-        }
+        flashUntil = now + 120;
 
         String label = chose.label;
         if ("🌐".equals(label)) {
@@ -370,6 +535,7 @@ public class KlavaKeyboardView extends View {
             calibrate(chose, x, y);
             if (shift && !caps) shift = false;
         }
+        refreshSuggestions();
         invalidate();
     }
 
@@ -391,6 +557,7 @@ public class KlavaKeyboardView extends View {
     }
 
     private Key hardHit(float x, float y) {
+        // Prefer keys in keyboard area (ignore suggestion strip for key hits)
         Key best = null;
         float bestD = Float.MAX_VALUE;
         for (Key k : keys) {
@@ -410,7 +577,6 @@ public class KlavaKeyboardView extends View {
         float cx = x - biasX;
         float cy = y - biasY;
 
-        // Special controls: trust hard hit-box.
         if (hard != null && ("⌫".equals(hard.label) || "↵".equals(hard.label)
                 || "␣".equals(hard.label) || "⇧".equals(hard.label) || "🌐".equals(hard.label))) {
             Pick p = new Pick();
@@ -418,6 +584,9 @@ public class KlavaKeyboardView extends View {
             p.zoneMul = zoneMul;
             return p;
         }
+
+        String prefix = listener != null ? safe(listener.currentWordPrefix()) : "";
+        Map<String, Float> freq = english ? FREQ_EN : FREQ_RU;
 
         Key best = null;
         float bestScore = -Float.MAX_VALUE;
@@ -430,8 +599,14 @@ public class KlavaKeyboardView extends View {
             float nd2 = dx * dx + dy * dy;
             if (nd2 > 2.8f) continue;
 
-            float freq = FREQ.containsKey(k.label) ? FREQ.get(k.label) : 0.05f;
-            float score = (float) (Math.pow(freq, freqWeight) / (nd2 + 0.08f));
+            float base = freq.containsKey(k.label) ? freq.get(k.label) : 0.05f;
+            float slangBoost = 0f;
+            if (k.label.length() == 1) {
+                char ch = k.label.charAt(0);
+                slangBoost = 0.15f * dict.letterBoost(ch, english)
+                        + 0.55f * dict.nextLetterBoost(prefix, ch, english);
+            }
+            float score = (float) ((Math.pow(base, freqWeight) + slangBoost) / (nd2 + 0.08f));
             if (score > bestScore) {
                 bestScore = score;
                 best = k;

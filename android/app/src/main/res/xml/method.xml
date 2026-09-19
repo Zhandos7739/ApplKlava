@@ -7,4 +7,8 @@
         android:label="@string/ime_subtype_ru"
         android:imeSubtypeLocale="ru_RU"
         android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="@string/ime_subtype_en"
+        android:imeSubtypeLocale="en_US"
+        android:imeSubtypeMode="keyboard" />
 </input-method>

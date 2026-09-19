@@ -22,12 +22,41 @@ public class KlavaImeService extends InputMethodService implements KlavaKeyboard
         super.onStartInputView(info, restarting);
         if (keyboardView != null) {
             keyboardView.reloadPrefs();
+            keyboardView.refreshSuggestions();
+        }
+    }
+
+    @Override
+    public void onUpdateSelection(int oldSelStart, int oldSelEnd, int newSelStart, int newSelEnd,
+                                  int candidatesStart, int candidatesEnd) {
+        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd);
+        if (keyboardView != null) {
+            keyboardView.refreshSuggestions();
         }
     }
 
     @Override
     public boolean onEvaluateFullscreenMode() {
         return false;
+    }
+
+    @Override
+    public String currentWordPrefix() {
+        InputConnection ic = getCurrentInputConnection();
+        if (ic == null) return "";
+        CharSequence before = ic.getTextBeforeCursor(48, 0);
+        if (before == null || before.length() == 0) return "";
+        String s = before.toString();
+        int i = s.length() - 1;
+        while (i >= 0) {
+            char c = s.charAt(i);
+            if (Character.isLetter(c) || c == '\'' || c == '-' || c == 'ё' || c == 'Ё') {
+                i--;
+            } else {
+                break;
+            }
+        }
+        return s.substring(i + 1);
     }
 
     @Override
@@ -42,6 +71,7 @@ public class KlavaImeService extends InputMethodService implements KlavaKeyboard
             } else {
                 ic.deleteSurroundingText(1, 0);
             }
+            if (keyboardView != null) keyboardView.refreshSuggestions();
             return;
         }
 
@@ -58,10 +88,12 @@ public class KlavaImeService extends InputMethodService implements KlavaKeyboard
             } else {
                 ic.commitText("\n", 1);
             }
+            if (keyboardView != null) keyboardView.refreshSuggestions();
             return;
         }
 
         ic.commitText(label, 1);
+        if (keyboardView != null) keyboardView.refreshSuggestions();
     }
 
     @Override

@@ -2,7 +2,8 @@
 <resources>
     <string name="app_name">ApplKlava</string>
     <string name="ime_name">ApplKlava</string>
-    <string name="ime_subtype_ru">Русский (Нано-зоны)</string>
+    <string name="ime_subtype_ru">Русский (Нано)</string>
+    <string name="ime_subtype_en">English (Nano)</string>
     <string name="title_activity_main">ApplKlava</string>
     <string name="package_name">com.applklava.keyboard</string>
     <string name="custom_url_scheme">com.applklava.keyboard</string>
