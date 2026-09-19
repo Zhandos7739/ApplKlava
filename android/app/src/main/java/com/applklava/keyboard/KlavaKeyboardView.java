@@ -5,6 +5,8 @@ import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.RectF;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
@@ -12,6 +14,10 @@ import android.util.TypedValue;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -31,6 +37,8 @@ public class KlavaKeyboardView extends View {
         void onOpenSettings();
         /** Current composing word prefix before cursor (letters only). */
         String currentWordPrefix();
+        /** Wipe all text in the focused field. */
+        void onDeleteAll();
     }
 
     private static final String[][] LAYOUT_RU = {
@@ -111,6 +119,30 @@ public class KlavaKeyboardView extends View {
 
     private float suggestH;
     private float keyboardH;
+    private int navInsetPx;
+
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private boolean backspaceTracking;
+    private boolean backspaceDidFull;
+    private final Runnable backspaceLongPress = new Runnable() {
+        @Override public void run() {
+            if (!backspaceTracking) return;
+            backspaceDidFull = true;
+            if (listener != null) listener.onDeleteAll();
+            // keep pressed look briefly, then clear
+            scheduleFlashClear(1800);
+            refreshSuggestions();
+            invalidate();
+        }
+    };
+    private final Runnable flashClear = new Runnable() {
+        @Override public void run() {
+            chosenKey = null;
+            pressedKey = null;
+            langToast = null;
+            invalidate();
+        }
+    };
 
     public KlavaKeyboardView(Context context) {
         super(context);
@@ -151,6 +183,33 @@ public class KlavaKeyboardView extends View {
 
         setClickable(true);
         setFocusable(false);
+
+        ViewCompat.setOnApplyWindowInsetsListener(this, (v, insets) -> {
+            Insets bars = insets.getInsets(WindowInsetsCompat.Type.navigationBars());
+            int bottom = Math.max(bars.bottom, fallbackNavInset());
+            if (navInsetPx != bottom) {
+                navInsetPx = bottom;
+                requestLayout();
+            }
+            return insets;
+        });
+    }
+
+    private int fallbackNavInset() {
+        int resId = getResources().getIdentifier("navigation_bar_height", "dimen", "android");
+        int sys = resId > 0 ? getResources().getDimensionPixelSize(resId) : 0;
+        // Extra cushion so space isn't under Home / gesture bar.
+        return Math.max(sys, (int) dp(28));
+    }
+
+    private int navPad() {
+        return navInsetPx > 0 ? navInsetPx : fallbackNavInset();
+    }
+
+    private void scheduleFlashClear(long delayMs) {
+        handler.removeCallbacks(flashClear);
+        flashUntil = SystemClock.uptimeMillis() + delayMs;
+        handler.postDelayed(flashClear, delayMs);
     }
 
     public void setListener(Listener listener) {
@@ -198,21 +257,23 @@ public class KlavaKeyboardView extends View {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int w = MeasureSpec.getSize(widthMeasureSpec);
-        // Fit small phones: ~32% of screen, capped.
-        int target = Math.round(screenHeight() * 0.32f);
-        int minH = (int) dp(200);
-        int maxH = (int) dp(248);
-        int h = Math.max(minH, Math.min(maxH, target));
-        suggestH = dp(36);
-        keyboardH = h - suggestH;
+        // Fit small phones: ~30% of screen for keys+suggestions, plus nav pad.
+        int target = Math.round(screenHeight() * 0.30f);
+        int minH = (int) dp(190);
+        int maxH = (int) dp(236);
+        int content = Math.max(minH, Math.min(maxH, target));
+        suggestH = dp(34);
+        keyboardH = content - suggestH;
+        int h = content + navPad();
         setMeasuredDimension(w, h);
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
-        suggestH = dp(36);
-        keyboardH = h - suggestH;
+        suggestH = dp(34);
+        int nav = navPad();
+        keyboardH = Math.max(dp(140), h - suggestH - nav);
         layoutKeys(w, (int) keyboardH);
         refreshSuggestions();
     }
@@ -365,6 +426,9 @@ public class KlavaKeyboardView extends View {
                 downY = event.getY(idx);
                 spaceSwiped = false;
                 spaceTracking = false;
+                backspaceTracking = false;
+                backspaceDidFull = false;
+                handler.removeCallbacks(backspaceLongPress);
 
                 int sug = hitSuggestion(downX, downY);
                 if (sug >= 0) {
@@ -376,6 +440,11 @@ public class KlavaKeyboardView extends View {
                 Key hit = hardHit(downX, downY);
                 pressedKey = hit;
                 spaceTracking = hit != null && "␣".equals(hit.label);
+                if (hit != null && "⌫".equals(hit.label)) {
+                    backspaceTracking = true;
+                    // Hold ~0.4s → wipe ALL text (not one-by-one).
+                    handler.postDelayed(backspaceLongPress, 400);
+                }
                 invalidate();
                 return true;
             }
@@ -389,9 +458,21 @@ public class KlavaKeyboardView extends View {
                     float dx = x - downX;
                     if (Math.abs(dx) > dp(36)) {
                         spaceSwiped = true;
-                        // Preview the language we will switch TO
                         langToast = english ? "Русский" : "English";
-                        langToastUntil = SystemClock.uptimeMillis() + 600;
+                        langToastUntil = SystemClock.uptimeMillis() + 900;
+                        scheduleFlashClear(900);
+                        invalidate();
+                    }
+                    return true;
+                }
+
+                if (backspaceTracking) {
+                    Key under = hardHit(x, y);
+                    if (under == null || !"⌫".equals(under.label)) {
+                        // slid off delete — cancel full wipe
+                        handler.removeCallbacks(backspaceLongPress);
+                        backspaceTracking = false;
+                        pressedKey = under;
                         invalidate();
                     }
                     return true;
@@ -411,6 +492,8 @@ public class KlavaKeyboardView extends View {
                     if (event.getPointerId(event.getActionIndex()) == activePointerId) {
                         activePointerId = MotionEvent.INVALID_POINTER_ID;
                         pressedKey = null;
+                        handler.removeCallbacks(backspaceLongPress);
+                        backspaceTracking = false;
                         invalidate();
                     }
                     return true;
@@ -419,11 +502,13 @@ public class KlavaKeyboardView extends View {
                 float y = event.getY(idx);
                 activePointerId = MotionEvent.INVALID_POINTER_ID;
                 pressedKey = null;
+                handler.removeCallbacks(backspaceLongPress);
 
                 int sug = hitSuggestion(downX, downY);
                 if (sug >= 0 && Math.hypot(x - downX, y - downY) < dp(24)) {
                     commitSuggestion(suggestWords.get(sug));
                     spaceTracking = false;
+                    backspaceTracking = false;
                     invalidate();
                     return true;
                 }
@@ -433,11 +518,24 @@ public class KlavaKeyboardView extends View {
                     if (spaceSwiped || Math.abs(dx) > dp(36)) {
                         toggleLanguage();
                     } else {
-                        // normal space tap
                         commitAt(downX, downY);
                     }
                     spaceTracking = false;
                     spaceSwiped = false;
+                    invalidate();
+                    return true;
+                }
+
+                if (backspaceTracking) {
+                    boolean full = backspaceDidFull;
+                    backspaceTracking = false;
+                    backspaceDidFull = false;
+                    if (!full) {
+                        // short tap → one char
+                        commitAt(downX, downY);
+                    } else {
+                        scheduleFlashClear(1800);
+                    }
                     invalidate();
                     return true;
                 }
@@ -450,6 +548,10 @@ public class KlavaKeyboardView extends View {
                 pressedKey = null;
                 spaceTracking = false;
                 spaceSwiped = false;
+                backspaceTracking = false;
+                backspaceDidFull = false;
+                handler.removeCallbacks(backspaceLongPress);
+                scheduleFlashClear(0);
                 invalidate();
                 return true;
             default:
@@ -482,7 +584,8 @@ public class KlavaKeyboardView extends View {
         saveLang();
         shift = false;
         langToast = english ? "English" : "Русский";
-        langToastUntil = SystemClock.uptimeMillis() + 700;
+        langToastUntil = SystemClock.uptimeMillis() + 900;
+        scheduleFlashClear(900);
         layoutKeys(getWidth(), (int) keyboardH);
         refreshSuggestions();
         invalidate();
@@ -509,7 +612,8 @@ public class KlavaKeyboardView extends View {
         }
 
         chosenKey = chose;
-        flashUntil = now + 120;
+        // Press highlight stays briefly, then fades (~2 sec max).
+        scheduleFlashClear(1800);
 
         String label = chose.label;
         if ("🌐".equals(label)) {
