@@ -114,7 +114,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="18dp"
-            android:text="На клавиатуре: «Обыч.» — системная клава. Свайп по пробелу — RU ↔ EN. Сверху подсказки со сленгом."
+            android:text="Сверху «Обыч.» — системная клава. Кнопка 123 — цифры и символы. Свайп по пробелу — RU ↔ EN."
             android:textColor="#8AA0BD"
             android:textSize="13sp" />
 

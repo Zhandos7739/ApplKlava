@@ -45,15 +45,32 @@ public class KlavaKeyboardView extends View {
             {"й", "ц", "у", "к", "е", "н", "г", "ш", "щ", "з", "х"},
             {"ф", "ы", "в", "а", "п", "р", "о", "л", "д", "ж", "э"},
             {"⇧", "я", "ч", "с", "м", "и", "т", "ь", "б", "ю", "⌫"},
-            {"🌐", ",", "␣", ".", "↵"}
+            {"123", ",", "␣", ".", "↵"}
     };
 
     private static final String[][] LAYOUT_EN = {
             {"q", "w", "e", "r", "t", "y", "u", "i", "o", "p"},
             {"a", "s", "d", "f", "g", "h", "j", "k", "l"},
             {"⇧", "z", "x", "c", "v", "b", "n", "m", "⌫"},
-            {"🌐", ",", "␣", ".", "↵"}
+            {"123", ",", "␣", ".", "↵"}
     };
+
+    private static final String[][] LAYOUT_NUM = {
+            {"1", "2", "3", "4", "5", "6", "7", "8", "9", "0"},
+            {"@", "#", "$", "%", "&", "-", "+", "(", ")"},
+            {"#+=" , "!", "\"", "'", ":", ";", "/", "?", "⌫"},
+            {"ABC", ",", "␣", ".", "↵"}
+    };
+
+    private static final String[][] LAYOUT_SYM = {
+            {"[", "]", "{", "}", "<", ">", "^", "*", "~", "`"},
+            {"€", "£", "¥", "₽", "•", "°", "=", "_", "\\"},
+            {"123", "©", "®", "™", "✓", "|", "№", "⌫"},
+            {"ABC", "<", "␣", ">", "↵"}
+    };
+
+    /** 0 = letters, 1 = numbers, 2 = more symbols */
+    private int page;
 
     private static final Map<String, Float> FREQ_RU = new HashMap<>();
     private static final Map<String, Float> FREQ_EN = new HashMap<>();
@@ -80,6 +97,8 @@ public class KlavaKeyboardView extends View {
     private final List<RectF> suggestHit = new ArrayList<>();
     private final List<String> suggestWords = new ArrayList<>();
     private final WordDictionary dict = new WordDictionary();
+    private final RectF systemBtn = new RectF();
+    private boolean systemBtnPressed;
 
     private final Paint keyPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint keyPressPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -279,7 +298,23 @@ public class KlavaKeyboardView extends View {
     }
 
     private String[][] currentLayout() {
+        if (page == 1) return LAYOUT_NUM;
+        if (page == 2) return LAYOUT_SYM;
         return english ? LAYOUT_EN : LAYOUT_RU;
+    }
+
+    private void relayout() {
+        if (getWidth() <= 0) return;
+        layoutKeys(getWidth(), (int) keyboardH);
+        layoutSuggestionHits();
+        invalidate();
+    }
+
+    private void setPage(int p) {
+        page = p;
+        shift = false;
+        relayout();
+        refreshSuggestions();
     }
 
     private void layoutKeys(int w, int h) {
@@ -322,9 +357,13 @@ public class KlavaKeyboardView extends View {
             case "⌫":
             case "↵":
             case "⇧": return 1.4f;
-            case "🌐": return 1.55f;
+            case "123":
+            case "ABC":
+            case "#+=": return 1.7f;
             case ",":
-            case ".": return 1.05f;
+            case ".":
+            case "<":
+            case ">": return 1.05f;
             default: return 1f;
         }
     }
@@ -332,7 +371,11 @@ public class KlavaKeyboardView extends View {
     public void refreshSuggestions() {
         String prefix = listener != null ? safe(listener.currentWordPrefix()) : "";
         suggestWords.clear();
-        suggestWords.addAll(dict.suggestions(prefix, english, 4));
+        // fewer chips — room for top «Обыч.» button
+        int limit = page == 0 ? 3 : 0;
+        if (limit > 0) {
+            suggestWords.addAll(dict.suggestions(prefix, english, limit));
+        }
         layoutSuggestionHits();
         invalidate();
     }
@@ -343,14 +386,20 @@ public class KlavaKeyboardView extends View {
 
     private void layoutSuggestionHits() {
         suggestHit.clear();
-        if (suggestWords.isEmpty() || getWidth() <= 0) return;
+        if (getWidth() <= 0) return;
         float pad = dp(4);
         float gap = dp(4);
-        float chipW = (getWidth() - pad * 2 - gap * (suggestWords.size() - 1)) / (float) suggestWords.size();
         float top = dp(4);
         float h = suggestH - dp(8);
+        float sysW = dp(72);
+        systemBtn.set(pad, top, pad + sysW, top + h);
+
+        float left = systemBtn.right + gap;
+        if (suggestWords.isEmpty()) return;
+        float usable = getWidth() - left - pad - gap * (suggestWords.size() - 1);
+        float chipW = usable / suggestWords.size();
         for (int i = 0; i < suggestWords.size(); i++) {
-            float x = pad + i * (chipW + gap);
+            float x = left + i * (chipW + gap);
             suggestHit.add(new RectF(x, top, x + chipW, top + h));
         }
     }
@@ -359,6 +408,13 @@ public class KlavaKeyboardView extends View {
     protected void onDraw(Canvas canvas) {
         canvas.drawRect(0, 0, getWidth(), getHeight(), bgPaint);
         long now = SystemClock.uptimeMillis();
+
+        // Top «Обыч.» → system keyboard
+        boolean sysPress = systemBtnPressed;
+        canvas.drawRoundRect(systemBtn, dp(8), dp(8), sysPress ? keyPressPaint : chipPaint);
+        chipTextPaint.setTextSize(dp(12));
+        float sysTy = systemBtn.centerY() - (chipTextPaint.descent() + chipTextPaint.ascent()) / 2f;
+        canvas.drawText("Обыч.", systemBtn.centerX(), sysTy, chipTextPaint);
 
         // Suggestion chips
         chipTextPaint.setTextSize(dp(13));
@@ -389,12 +445,14 @@ public class KlavaKeyboardView extends View {
 
     private boolean isSpecial(String label) {
         return "⌫".equals(label) || "↵".equals(label) || "⇧".equals(label)
-                || "🌐".equals(label) || "␣".equals(label) || ",".equals(label) || ".".equals(label);
+                || "123".equals(label) || "ABC".equals(label) || "#+=".equals(label)
+                || "␣".equals(label) || ",".equals(label) || ".".equals(label)
+                || "<".equals(label) || ">".equals(label);
     }
 
     private float textSizeFor(String label) {
         if ("␣".equals(label)) return dp(12);
-        if ("🌐".equals(label)) return dp(11);
+        if ("123".equals(label) || "ABC".equals(label) || "#+=".equals(label)) return dp(12);
         if ("⇧".equals(label) || "⌫".equals(label) || "↵".equals(label)) return dp(14);
         return dp(17);
     }
@@ -402,12 +460,16 @@ public class KlavaKeyboardView extends View {
     private String displayLabel(String label) {
         switch (label) {
             case "␣": return english ? "en · swipe" : "ru · свайп";
-            case "🌐": return "Обыч.";
+            case "123": return "123";
+            case "ABC": return "ABC";
+            case "#+=": return "#+=";
             case "⇧": return "⇧";
             case "⌫": return "⌫";
             case "↵": return "↵";
             default:
-                if (shift || caps) return label.toUpperCase(Locale.ROOT);
+                if (page == 0 && (shift || caps) && label.length() == 1 && Character.isLetter(label.charAt(0))) {
+                    return label.toUpperCase(Locale.ROOT);
+                }
                 return label;
         }
     }
@@ -428,7 +490,15 @@ public class KlavaKeyboardView extends View {
                 spaceTracking = false;
                 backspaceTracking = false;
                 backspaceDidFull = false;
+                systemBtnPressed = false;
                 handler.removeCallbacks(backspaceLongPress);
+
+                if (systemBtn.contains(downX, downY)) {
+                    systemBtnPressed = true;
+                    pressedKey = null;
+                    invalidate();
+                    return true;
+                }
 
                 int sug = hitSuggestion(downX, downY);
                 if (sug >= 0) {
@@ -504,6 +574,15 @@ public class KlavaKeyboardView extends View {
                 pressedKey = null;
                 handler.removeCallbacks(backspaceLongPress);
 
+                if (systemBtnPressed) {
+                    systemBtnPressed = false;
+                    if (systemBtn.contains(x, y) || systemBtn.contains(downX, downY)) {
+                        if (listener != null) listener.onSwitchToSystem();
+                    }
+                    invalidate();
+                    return true;
+                }
+
                 int sug = hitSuggestion(downX, downY);
                 if (sug >= 0 && Math.hypot(x - downX, y - downY) < dp(24)) {
                     commitSuggestion(suggestWords.get(sug));
@@ -550,6 +629,7 @@ public class KlavaKeyboardView extends View {
                 spaceSwiped = false;
                 backspaceTracking = false;
                 backspaceDidFull = false;
+                systemBtnPressed = false;
                 handler.removeCallbacks(backspaceLongPress);
                 scheduleFlashClear(0);
                 invalidate();
@@ -583,10 +663,11 @@ public class KlavaKeyboardView extends View {
         english = !english;
         saveLang();
         shift = false;
+        page = 0;
         langToast = english ? "English" : "Русский";
         langToastUntil = SystemClock.uptimeMillis() + 900;
         scheduleFlashClear(900);
-        layoutKeys(getWidth(), (int) keyboardH);
+        relayout();
         refreshSuggestions();
         invalidate();
     }
@@ -616,9 +697,16 @@ public class KlavaKeyboardView extends View {
         scheduleFlashClear(1800);
 
         String label = chose.label;
-        if ("🌐".equals(label)) {
-            if (listener != null) listener.onSwitchToSystem();
-            invalidate();
+        if ("123".equals(label)) {
+            setPage(1);
+            return;
+        }
+        if ("#+=".equals(label)) {
+            setPage(2);
+            return;
+        }
+        if ("ABC".equals(label)) {
+            setPage(0);
             return;
         }
         if ("⇧".equals(label)) {
@@ -648,10 +736,10 @@ public class KlavaKeyboardView extends View {
             case "␣": return " ";
             case "↵": return "\n";
             case "⌫": return "⌫";
-            case ",": return ",";
-            case ".": return ".";
             default:
-                if (shift || caps) return label.toUpperCase(Locale.ROOT);
+                if (page == 0 && (shift || caps) && label.length() == 1 && Character.isLetter(label.charAt(0))) {
+                    return label.toUpperCase(Locale.ROOT);
+                }
                 return label;
         }
     }
@@ -682,7 +770,16 @@ public class KlavaKeyboardView extends View {
         float cy = y - biasY;
 
         if (hard != null && ("⌫".equals(hard.label) || "↵".equals(hard.label)
-                || "␣".equals(hard.label) || "⇧".equals(hard.label) || "🌐".equals(hard.label))) {
+                || "␣".equals(hard.label) || "⇧".equals(hard.label)
+                || "123".equals(hard.label) || "ABC".equals(hard.label) || "#+=".equals(hard.label))) {
+            Pick p = new Pick();
+            p.chose = hard;
+            p.zoneMul = zoneMul;
+            return p;
+        }
+
+        // On symbol pages, use hard hit / nearest (no letter soft-zone).
+        if (page != 0) {
             Pick p = new Pick();
             p.chose = hard;
             p.zoneMul = zoneMul;
@@ -696,7 +793,8 @@ public class KlavaKeyboardView extends View {
         float bestScore = -Float.MAX_VALUE;
         for (Key k : keys) {
             if ("⌫".equals(k.label) || "↵".equals(k.label) || "␣".equals(k.label)
-                    || "⇧".equals(k.label) || "🌐".equals(k.label)) continue;
+                    || "⇧".equals(k.label) || "123".equals(k.label) || "ABC".equals(k.label)
+                    || "#+=".equals(k.label)) continue;
 
             float dx = (cx - k.cx) / (k.halfW * zoneMul);
             float dy = (cy - k.cy) / (k.halfH * zoneMul);

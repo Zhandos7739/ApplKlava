@@ -7,35 +7,36 @@
 <style>
   body{margin:0;background:#111;display:flex;justify-content:center;padding:16px;font-family:Segoe UI,sans-serif}
   .phone{width:360px;background:#071018;border-radius:20px;overflow:hidden;border:1px solid #234}
-  .app{padding:14px;color:#e8f1ff;min-height:160px}
+  .app{padding:14px;color:#e8f1ff;min-height:140px}
   .app h1{margin:0;font-size:18px}
   .app p{color:#8aa0bd;font-size:12px;margin:6px 0}
   .field{margin-top:8px;background:#0f1b2d;border:1px solid #2a3f5c;border-radius:10px;padding:10px;min-height:48px}
   .kb{background:#0b1420;padding:4px 4px 6px}
   .sug{display:flex;gap:4px;padding:2px 0 4px}
   .chip{flex:1;background:#16253b;color:#e8f1ff;border-radius:8px;text-align:center;padding:8px 0;font-size:12px;font-weight:700}
+  .sys{flex:0 0 72px;background:#2e4a72;color:#3dd6c6}
   .row{display:flex;gap:3px;margin:3px 0}
   .k{flex:1;background:#1a2a42;color:#e8f1ff;border-radius:7px;text-align:center;padding:9px 0;font-weight:700;font-size:13px}
   .sp{flex:4.8;font-size:11px;color:#8aa0bd}
-  .sp2{flex:1.5;color:#8aa0bd;font-size:10px}
+  .sp2{flex:1.6;color:#8aa0bd;font-size:11px}
   .spec{color:#8aa0bd;font-size:11px}
   .banner{background:#16253b;color:#3dd6c6;padding:7px 10px;font-size:11px;text-align:center}
 </style>
 </head>
 <body>
 <div class="phone">
-  <div class="banner">Отступ от Home · зажать ⌫ = стереть всё · подсветка гаснет</div>
+  <div class="banner">Обыч. сверху · 123 = цифры/символы · #+ = ещё символы</div>
   <div class="app">
     <h1>Чат</h1>
-    <p>Свайпни пробел — как на Honor</p>
-    <div class="field">щас го|</div>
+    <p>Цифры через кнопку 123 слева внизу</p>
+    <div class="field">привет 123|</div>
   </div>
   <div class="kb">
-    <div class="sug"><div class="chip">щас</div><div class="chip">го</div><div class="chip">хз</div><div class="chip">пж</div></div>
+    <div class="sug"><div class="chip sys">Обыч.</div><div class="chip">норм</div><div class="chip">щас</div><div class="chip">го</div></div>
     <div class="row"><div class="k">й</div><div class="k">ц</div><div class="k">у</div><div class="k">к</div><div class="k">е</div><div class="k">н</div><div class="k">г</div><div class="k">ш</div><div class="k">щ</div><div class="k">з</div><div class="k">х</div></div>
     <div class="row"><div class="k">ф</div><div class="k">ы</div><div class="k">в</div><div class="k">а</div><div class="k">п</div><div class="k">р</div><div class="k">о</div><div class="k">л</div><div class="k">д</div><div class="k">ж</div><div class="k">э</div></div>
     <div class="row"><div class="k spec">⇧</div><div class="k">я</div><div class="k">ч</div><div class="k">с</div><div class="k">м</div><div class="k">и</div><div class="k">т</div><div class="k">ь</div><div class="k">б</div><div class="k">ю</div><div class="k spec">⌫</div></div>
-    <div class="row"><div class="k sp2">Обыч.</div><div class="k spec">,</div><div class="k sp">ru · свайп</div><div class="k spec">.</div><div class="k spec">↵</div></div>
+    <div class="row"><div class="k sp2">123</div><div class="k spec">,</div><div class="k sp">ru · свайп</div><div class="k spec">.</div><div class="k spec">↵</div></div>
   </div>
 </div>
 </body>
