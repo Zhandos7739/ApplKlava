@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="#071018">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="20dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="ApplKlava"
+            android:textColor="#E8F1FF"
+            android:textSize="28sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Системная клавиатура с динамической зоной"
+            android:textColor="#8AA0BD"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:background="#16253B"
+            android:padding="14dp"
+            android:textColor="#E8F1FF"
+            android:textSize="15sp" />
+
+        <Button
+            android:id="@+id/btnEnable"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="14dp"
+            android:text="1. Включить ApplKlava"
+            android:backgroundTint="#3DD6C6"
+            android:textColor="#041018" />
+
+        <Button
+            android:id="@+id/btnChoose"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="2. Выбрать ApplKlava"
+            android:backgroundTint="#6EA8FF"
+            android:textColor="#041018" />
+
+        <Button
+            android:id="@+id/btnPicker"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Сменить клавиатуру (системный выбор)"
+            android:backgroundTint="#274066"
+            android:textColor="#E8F1FF" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="Проверка ввода"
+            android:textColor="#E8F1FF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/testField"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#0F1B2D"
+            android:hint="Тапни сюда и печатай"
+            android:textColorHint="#8AA0BD"
+            android:textColor="#E8F1FF"
+            android:padding="14dp"
+            android:minLines="3"
+            android:gravity="top"
+            android:inputType="textMultiLine" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="Ширина зоны (Нано)"
+            android:textColor="#E8F1FF"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/zoneVal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="1.45×"
+            android:textColor="#3DD6C6"
+            android:textSize="14sp" />
+
+        <SeekBar
+            android:id="@+id/zoneBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp"
+            android:text="На клавиатуре кнопка «Обычная» возвращает системную клаву. Шире зона — меньше промахов при быстрой печати."
+            android:textColor="#8AA0BD"
+            android:textSize="13sp" />
+
+    </LinearLayout>
+</ScrollView>
